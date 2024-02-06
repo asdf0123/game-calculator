@@ -1,4 +1,5 @@
-from math import log2
+from math import log2,factorial
+import traceback
 from itertools import product,permutations
 def H(s):
 	dic={}
@@ -496,6 +497,7 @@ consecutive numbers)
 The Verifier does not know if the sequence is increasing or decreasing
 
 323 和 325 返回值相同
+f(323)*f(325)=1
 '''
 G26=G([alt3,blt3,clt3],[2]*3)
 G27=G([alt4,blt4,clt4],[2]*3)
@@ -549,11 +551,11 @@ def calcmonoset(op):
 			ret[dicall[k].pop()]=k
 	return ret
 def determined(verifiers,silent=True):
-	a=calcmonoset(verifiers)
+	a=calcmonoset(verifiers)#necessary
 	for i in range(len(verifiers)):
-		b=calcmonoset(verifiers[:i]+verifiers[i+1:])
+		b=calcmonoset(verifiers[:i]+verifiers[i+1:])#not sufficient
 		if not silent:
-			print("delete rule",i,b.keys())
+			print("delete {} candidates by rule {}: {}".format(len(a.keys()&b.keys()),i,b.keys()))
 		reserved=a.keys()-b.keys()
 		a={key:a[key] for key in reserved}
 	tosort=list((int(key),a[key]) for key in a.keys())
@@ -578,30 +580,25 @@ def solve(verifiers):
 			candidates.append((ele[0],tuple(zip(masks,ele[1]))))
 	candidates.sort(key=lambda x:x[1])
 	return candidates
-def dfs(candidatesnames,rating,cols,depth=3):
+def dfs(candidatesnames,ratings,cols,depth=3):
 	h=H(candidatesnames)
 	if depth==0 or h<0.01:
-		return h,set(candidatesnames)
-	minh,mins=7,None
+		return h,set(candidatesnames),depth
+	minh,mins,maxbonus=h,set(candidatesnames),depth
 	for col in cols:
-		candidatesnames0=tuple(candidatesnames[i] for i in range(len(candidatesnames)) if rating[i][col]==False)
-		candidatesnames1=tuple(candidatesnames[i] for i in range(len(candidatesnames)) if rating[i][col]==True)
-		rating0=tuple(filter(lambda x: x[col]==False,rating))
-		rating1=tuple(filter(lambda x: x[col]==True,rating))
+		candidatesnames0=tuple(candidatesnames[i] for i in range(len(candidatesnames)) if ratings[i][col]==False)
+		candidatesnames1=tuple(candidatesnames[i] for i in range(len(candidatesnames)) if ratings[i][col]==True)
+		ratings0=tuple(filter(lambda x: x[col]==False,ratings))
+		ratings1=tuple(filter(lambda x: x[col]==True,ratings))
 		w0,w1=len(candidatesnames0),len(candidatesnames1)
 		w0,w1=w0/(w0+w1),w1/(w0+w1)
-		h0,s0=dfs(candidatesnames0,rating0,cols-set([col]),depth-1)
-		h1,s1=dfs(candidatesnames1,rating1,cols-set([col]),depth-1)
+		h0,s0,bonus0=dfs(candidatesnames0,ratings0,cols-set([col]),depth-1)
+		h1,s1,bonus1=dfs(candidatesnames1,ratings1,cols-set([col]),depth-1)
 		h=w0*h0+w1*h1
-		if minh>h:
-			minh=h
-			if len(candidatesnames0)==0:
-				mins=s1
-			elif len(candidatesnames1)==0:
-				mins=s0
-			else:
-				mins=(chr(col+ord("A")),s0,s1)
-	return minh,mins
+		bonus=w0*bonus0+w1*bonus1
+		if minh>h or (minh==h and maxbonus<bonus):
+			minh,mins,maxbonus=h,(chr(col+ord("A")),s0,s1),bonus
+	return minh,mins,maxbonus
 def decto5(x):
 	return str(x//25+1)+str(x//5%5+1)+str(x%5+1)
 def parseStrategy(s,depth=0):
@@ -614,32 +611,20 @@ def parseStrategy(s,depth=0):
 		print("\t"*depth,True,end="\t")
 		parseStrategy(s[2],depth+1)
 	return None
-def query(vnum,candidatesnames,rating):
-	while True:
-		h=H(candidatesnames)
-		minh,mins=h,("111",set(candidatesnames))
-		#if h<=0.01:[]
-		#	print(minh)
-		#	parseStrategy(mins)
-		#	break
-
-		#for ele in buf:
-		#	print(ele[-1])
-		
-		for depth in range(1,4):
-			for num in range(5**3):
-				h,s=dfs(candidatesnames,[ele[num] for ele in rating],set(range(vnum)),depth)
-				if minh>h:
-					minh,mins=h,(decto5(num),s)
-			if minh<0.01:
-				break
-				
-			#parseStrategy(mins[1])
-		print("False go left, true go right")
-		#manual filter
-		print("H={} check with {}".format(minh,mins))
-		#parseStrategy(mins[1])
-		break
+def query(vnum,candidatesnames,ratings):
+	h=H(candidatesnames)
+	minh,mins=h,("111",set(candidatesnames))
+	
+	for depth in range(1,4):
+		for num in range(5**3):
+			h,s,bonus=dfs(candidatesnames,[ele[num] for ele in ratings],set(range(vnum)),depth)
+			if minh>h:
+				minh,mins=h,(decto5(num),s)
+		if minh<0.01:
+			break
+			
+	print("False go left, true go right")
+	print("H={}, suggest checking with information: {}".format(minh,mins))
 	return minh,mins
 def calcrating(verifiers,candidates):
 	vnum=len(verifiers)
@@ -667,29 +652,34 @@ def stdclassic(verifiers):
 	show(ans)
 	return None
 simpleclassic=stdclassic
-def subhardclassic(fullverifiers):
+def prepare(fullverifiers):
 	candidates=solve(fullverifiers)
 	for candidate in candidates:
 		print("candidate",candidate)
 	candidatesnames=[candidate[0] for candidate in candidates]
-	#h=H(candidatesnames)
-	#minh=h
-	#if minh<0.01:
-	#	parseStrategy(set(candidatesnames))
-	#else:
-	if True:
-		rating=calcrating(fullverifiers,candidates)
-		vnum=len(fullverifiers)
-		for _ in range(5):
-			minh,mins=query(vnum,candidatesnames,rating)
-			print("enter {}".format(mins[0]))
-			parseStrategy(mins[1])
-			if H(candidatesnames)<0.01:
-				break
-			guess=mins[0]
-			guess=int(guess[0])*25+int(guess[1])*5+int(guess[2])*1-1-5-25
-			flag=True
-			while flag:
+	ratings=calcrating(fullverifiers,candidates)
+	return candidatesnames,ratings
+def subhardclassic(candidatesnames,ratings,vnum):
+	while True:
+		minh,mins=query(vnum,candidatesnames,ratings)
+		print("enter {}".format(mins[0]))#just adivce
+		parseStrategy(mins[1])#output
+		if H(candidatesnames)<0.01:
+			break
+		#guess=mins[0]
+		flag=True
+		while flag:
+				try:
+					guess=input("test num:\n")
+					guess=int(guess[0])*25+int(guess[1])*5+int(guess[2])*1-1-5-25
+					flag=False
+				except Exception as e:
+					print(e.args)
+					traceback.print_exc()
+					if input("retry?")[0] not in "Yy":
+						flag=False
+		flag=True
+		while flag:
 				try:
 					s=input("verifier&value:\n").strip().split(",")
 					s=[ele.split(":") for ele in s]
@@ -697,40 +687,59 @@ def subhardclassic(fullverifiers):
 					flag=False
 				except Exception as e:
 					print(e.args)
-					import traceback
 					traceback.print_exc()
 					if input("retry?")[0] not in "Yy":
 						flag=False
-			print(s)
-			lens=len(s)
-			sums=()
-			for ele in s:
-				sums+=ele
-			fstr="lambda x:{}".format(" and ".join(["x[{}]=={}"]*lens)).format(*sums)
-			f=eval(fstr)
-			#print(f)
-			#print(rating[0])
-			#print(candidatesnames[0])
-			#print(len(candidatesnames))
-			#print(len(rating))
-			ratingcol=[rows[guess] for rows in rating]
-			#for x in ratingcol:
-			#	print(fstr)
-			#	print(x)
-			#	print(f(x))
-			candidatesnames=[candidatesnames[i] for i in range(len(ratingcol)) if f(ratingcol[i])]
-			rating=[rating[i] for i in range(len(ratingcol)) if f(ratingcol[i])]
+		print(s)
+		fstr="lambda x:{}".format(" and ".join(["x[{}]=={}".format(*ele) for ele in s]))
+		print(fstr)
+		f=eval(fstr)
+		#print(f)
+		#print(ratings[0])
+		#print(candidatesnames[0])
+		#print(len(candidatesnames))
+		#print(len(ratings))
+		ratingscol=[rows[guess] for rows in ratings]
+		candidatesnames=[candidatesnames[i] for i in range(len(ratingscol)) if f(ratingscol[i])]
+		ratings=[ratings[i] for i in range(len(ratingscol)) if f(ratingscol[i])]
 	return None
 def hardclassic(verifiers):
 	fullverifiers=[eval("G{}".format(ele)) for ele in verifiers]
-	subhardclassic(fullverifiers)
+	candidatesnames,ratings=prepare(fullverifiers)
+	subhardclassic(candidatesnames,ratings,len(fullverifiers))
 	return None
 def hardextreme(verifiers1,verifiers2):
 	fullverifiers=[eval("G{}+G{}".format(x,y)) for x,y in zip(verifiers1,verifiers2)]
-	subhardclassic(fullverifiers)
+	candidatesnames,ratings=prepare(fullverifiers)
+	subhardclassic(candidatesnames,ratings,len(fullverifiers))
 	return None
 stdextreme=hardextreme
 simpleextreme=stdextreme
+def transpose_2d(data):
+    # transposed = list(zip(*data))
+    # [(1, 5, 9), (2, 6, 10), (3, 7, 11), (4, 8, 12)]
+    # 注意 zip 本身返回的数据类型为 tuple 元组
+    # 其中符号 * 号可以对元素进行解压或展开
+
+    transposed = list(map(list, zip(*data)))
+    return transposed
+def hardnightmare(verifiers):
+	fullverifiers=[eval("G{}".format(ele)) for ele in verifiers]
+	vnum=len(fullverifiers)
+	candidatesnames,ratings=prepare(fullverifiers)
+	fullratings=[]
+	fullcandidatesnames=[candidatename for candidatename in candidatesnames for _ in range(factorial(vnum))]
+	for rating in ratings:
+		buf=[list(permutations(ele)) for ele in rating]
+		#print(len(buf),len(buf[0]))
+		fullratings.extend(transpose_2d(buf))
+		#print(len(fullratings),len(fullratings[0]))
+	#print(*zip(fullcandidatesnames,range(len(fullcandidatesnames))))
+	#print(len(fullratings))
+	subhardclassic(fullcandidatesnames,fullratings,vnum)
+	pass
+stdnightmare=hardnightmare
+simpenightmare=stdnightmare
 def test():
 	verifiers=[5,15,16,19,21]#[4,7,13,17,19,22]
 	ans=stdclassic(verifiers)
@@ -748,7 +757,7 @@ def test():
 				(1, 0, 0)
 	multicase [19,20,24,31,33,45]#normal
 	special I high [8,20,23,40,46,48]
-	not balance [15,22,24,33,36,40]
+	not balance [15,22,24,33,36,40]#key 551
 	
 	
 enter 114
@@ -790,11 +799,11 @@ enter 111
 	'''
 if __name__=="__main__":
 	#test()
-	verifiers1=[9,20,27,31,33,38]#key 551 
+	verifiers1=[3,13,15,17]#key 551 
 	verifiers2=[13,4,16,5]
-	hardclassic(verifiers1)
+	#hardclassic(verifiers1)
 	#simpleextreme(verifiers1,verifiers2)
 
 	#hardclassic(verifiers1)
-
+	hardnightmare(verifiers1)
 
