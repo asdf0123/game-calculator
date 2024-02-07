@@ -1,6 +1,8 @@
 from math import log2,factorial
+from time import sleep
 import traceback
 from itertools import product,permutations
+from copy import copy
 def H(s):
 	dic={}
 	for ele in s:
@@ -504,7 +506,7 @@ G27=G([alt4,blt4,clt4],[2]*3)
 G28=G([cmpa1,cmpb1,cmpc1],[2]*3)#[aeq1,beq1,ceq1]
 G29=G([aeq3,beq3,ceq3],[2]*3)
 G30=G([aeq4,beq4,ceq4],[2]*3)
-G31=G28#[agt1,bgt1,cgt1]
+G31=copy(G28)#[agt1,bgt1,cgt1]
 G32=G([agt3,bgt3,cgt3],[2]*3)
 G33=G([paritya,parityb,parityc],[2]*3)
 G34=G([aminimum,bminimum,cminimum],[2]*3)
@@ -512,7 +514,7 @@ G35=G([amaximum,bmaximum,cmaximum],[2]*3)
 G36=G([sumabcdiv3,sumabcdiv4,sumabcdiv5],[2]*3)
 G37=G([sumabeq4,sumaceq4,sumbceq4],[2]*3)
 G38=G([sumabeq6,sumaceq6,sumbceq6],[2]*3)
-G39=G31#[cmpa1,cmpb1,cmpc1]
+G39=copy(G31)#[cmpa1,cmpb1,cmpc1]
 G40=G([cmpa3,cmpb3,cmpc3],[3]*3)
 G41=G([cmpa4,cmpb4,cmpc4],[3]*3)
 G42=G([argmin,argmax],[3]*2)
@@ -599,8 +601,9 @@ def dfs(candidatesnames,ratings,cols,depth=3):
 		if minh>h or (minh==h and maxbonus<bonus):
 			minh,mins,maxbonus=h,(chr(col+ord("A")),s0,s1),bonus
 	return minh,mins,maxbonus
-def decto5(x):
+def radix5tostr(x):
 	return str(x//25+1)+str(x//5%5+1)+str(x%5+1)
+decto5=lambda x:sum((int(a)-1)*(5**(b-1)) for a,b in zip(x,range(len(x),0,-1)))
 def parseStrategy(s,depth=0):
 	if type(s)==set:
 		print(s)
@@ -619,7 +622,7 @@ def query(vnum,candidatesnames,ratings):
 		for num in range(5**3):
 			h,s,bonus=dfs(candidatesnames,[ele[num] for ele in ratings],set(range(vnum)),depth)
 			if minh>h:
-				minh,mins=h,(decto5(num),s)
+				minh,mins=h,(radix5tostr(num),s)
 		if minh<0.01:
 			break
 			
@@ -659,6 +662,31 @@ def prepare(fullverifiers):
 	candidatesnames=[candidate[0] for candidate in candidates]
 	ratings=calcrating(fullverifiers,candidates)
 	return candidatesnames,ratings
+def getinput(vnum):
+	guess=input("test num:\n")
+	try:
+		guess=decto5(guess)#int(guess[0])*25+int(guess[1])*5+int(guess[2])*1-1-5-25
+		assert (type(guess)==int and 0<=guess<5**3),"wtf"
+	except Exception as e:
+		print(e.args)
+		traceback.print_exc()
+		return None
+
+	s=input("verifier&value:\n").strip().split(",")
+	s=[ele.split(":") for ele in s]
+	filtexpr=[]
+	for x,y in s:
+		try:
+			key=ord(x)-ord("A")
+			assert (0<=key<vnum),"wtf"
+			assert (y[0] in "YyTtNnFf"),"wtf"
+			filtexpr.append((key,y[0] in "YyTt"))
+		except Exception as e:
+			print(e.args)
+			traceback.print_exc()
+			return None
+	return guess,filtexpr
+
 def subhardclassic(candidatesnames,ratings,vnum):
 	while True:
 		minh,mins=query(vnum,candidatesnames,ratings)
@@ -667,31 +695,16 @@ def subhardclassic(candidatesnames,ratings,vnum):
 		if H(candidatesnames)<0.01:
 			break
 		#guess=mins[0]
-		flag=True
-		while flag:
-				try:
-					guess=input("test num:\n")
-					guess=int(guess[0])*25+int(guess[1])*5+int(guess[2])*1-1-5-25
-					flag=False
-				except Exception as e:
-					print(e.args)
-					traceback.print_exc()
-					if input("retry?")[0] not in "Yy":
-						flag=False
-		flag=True
-		while flag:
-				try:
-					s=input("verifier&value:\n").strip().split(",")
-					s=[ele.split(":") for ele in s]
-					s=[(ord(ele[0])-ord("A"),ele[1][0] in "YyTt") for ele in s]
-					flag=False
-				except Exception as e:
-					print(e.args)
-					traceback.print_exc()
-					if input("retry?")[0] not in "Yy":
-						flag=False
-		print(s)
-		fstr="lambda x:{}".format(" and ".join(["x[{}]=={}".format(*ele) for ele in s]))
+		while True:
+			result=getinput(vnum)
+			if result:
+				guess,filtexpr=result
+				break
+			else:
+				print("wtf? try again")
+				sleep(2)
+		#print(s)
+		fstr="lambda x:{}".format(" and ".join(["x[{}]=={}".format(*expr) for expr in filtexpr]))
 		print(fstr)
 		f=eval(fstr)
 		#print(f)
@@ -737,7 +750,7 @@ def hardnightmare(verifiers):
 	#print(*zip(fullcandidatesnames,range(len(fullcandidatesnames))))
 	#print(len(fullratings))
 	subhardclassic(fullcandidatesnames,fullratings,vnum)
-	pass
+	return None
 stdnightmare=hardnightmare
 simpenightmare=stdnightmare
 def test():
@@ -758,7 +771,7 @@ def test():
 	multicase [19,20,24,31,33,45]#normal
 	special I high [8,20,23,40,46,48]
 	not balance [15,22,24,33,36,40]#key 551
-	
+	wtf [13,28,31,40] empty?
 	
 enter 114
 B
@@ -799,11 +812,11 @@ enter 111
 	'''
 if __name__=="__main__":
 	#test()
-	verifiers1=[3,13,15,17]#key 551 
+	verifiers1=[13,28,31,40]#key 551 
 	verifiers2=[13,4,16,5]
 	#hardclassic(verifiers1)
 	#simpleextreme(verifiers1,verifiers2)
 
 	#hardclassic(verifiers1)
-	hardnightmare(verifiers1)
-
+	#hardnightmare(verifiers1)
+	hardclassic(verifiers1)
