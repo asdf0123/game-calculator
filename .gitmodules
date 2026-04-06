@@ -1,0 +1,3 @@
+[submodule "submodules/rust_soluna"]
+	path = submodules/rust_soluna
+	url = https://github.com/asdf0123/rust_soluna.git
